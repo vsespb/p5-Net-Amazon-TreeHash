@@ -28,7 +28,7 @@
    "provides" : {
       "Net::Amazon::TreeHash" : {
          "file" : "lib/Net/Amazon/TreeHash.pm",
-         "version" : "0.71"
+         "version" : "0.962"
       }
    },
    "release_status" : "stable",
@@ -37,5 +37,5 @@
          "http://www.gnu.org/licenses/gpl-3.0.txt"
       ]
    },
-   "version" : "0.71"
+   "version" : "0.962"
 }
