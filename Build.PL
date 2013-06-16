@@ -12,7 +12,7 @@ my $build = Module::Build->new(
         
     recursive_test_files=>1,
     dist_abstract=>'Amazon Glacier TreeHash algorithm',
-    license     => 'Software::License::GPL_3',
+    license     => 'gpl3',
     requires => {
         'Digest::SHA'        => 0,
     }

@@ -1,0 +1,41 @@
+{
+   "abstract" : "Amazon Glacier TreeHash algorithm",
+   "author" : [
+      "Victor Efimov"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "Module::Build version 0.4005, CPAN::Meta::Converter version 2.131560",
+   "license" : [
+      "open_source"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "Net-Amazon-TreeHash",
+   "prereqs" : {
+      "configure" : {
+         "requires" : {
+            "Module::Build" : "0.40"
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "Digest::SHA" : "0"
+         }
+      }
+   },
+   "provides" : {
+      "Net::Amazon::TreeHash" : {
+         "file" : "lib/Net/Amazon/TreeHash.pm",
+         "version" : "0.71"
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://www.gnu.org/licenses/gpl-3.0.txt"
+      ]
+   },
+   "version" : "0.71"
+}
