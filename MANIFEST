@@ -1,7 +1,8 @@
 Build.PL
 lib/Net/Amazon/TreeHash.pm
 MANIFEST			This list of files
+META.json
 META.yml
 README
 t/t_treehash.t
-META.json
+t/u_treehash.t
