@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use Test::Simple tests => 1065;
 use FindBin;
-use lib "$FindBin::RealBin/../", "$FindBin::RealBin/../../lib";
+use lib "$FindBin::RealBin/../lib";
 use Net::Amazon::TreeHash;
 
 $SIG{__WARN__} = sub {die "Termination after a warning: $_[0]"};
