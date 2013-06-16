@@ -1,6 +1,6 @@
-# mt-aws-glacier - AWS Glacier sync client
-# Copyright (C) 2012  Victor Efimov
-# vs@vs-dev.com http://vs-dev.com
+# mt-aws-glacier - Amazon Glacier sync client
+# Copyright (C) 2012-2013  Victor Efimov
+# http://mt-aws.com (also http://vs-dev.com) vs@vs-dev.com
 # License: GPLv3
 #
 # This file is part of "mt-aws-glacier"
@@ -26,6 +26,8 @@ package Net::Amazon::TreeHash;
 use strict;
 use warnings;
 use Digest::SHA qw/sha256/;
+use List::Util qw/max/;
+use Carp;
 
 =head1 NAME
 
@@ -93,9 +95,9 @@ sub eat_file
 {
 	my ($self, $fh) = @_;
 	while (1) {
-		my $r = sysread($fh, my $data, $self->{unit});
+		my $r = read($fh, my $data, $self->{unit});
 		if (!defined($r)) {
-			die;
+			die $!;
 		} elsif ($r > 0) {
 			$self->_eat_data_one_mb(\$data);
 		} else {
@@ -106,22 +108,78 @@ sub eat_file
 
 sub eat_data
 {
-	my ($self, $dataref)  = @_;
+	my $self = $_[0];
+	my $dataref = (ref($_[1]) eq '') ? \$_[1] : $_[1];
 	my $mb = $self->{unit};
 	my $n = length($$dataref);
-	my $i = 0;
-	while ($i < $n) {
-		my $part = substr($$dataref, $i, $mb);
-		$self->_eat_data_one_mb(\$part);
-		$i += $mb
+	# TODO: we should preserve last chunk of data actually, if it's smaller that chunk. (or create new method)
+	if ($n <= $mb) {
+		$self->_eat_data_one_mb($dataref);
+	} else {
+		my $i = 0;
+		while ($i < $n) {
+			my $part = substr($$dataref, $i, $mb);
+			$self->_eat_data_one_mb(\$part);
+			$i += $mb
+		}
 	}
+}
+
+sub eat_data_any_size
+{
+	my $self = $_[0];
+	my $dataref = (ref($_[1]) eq '') ? \$_[1] : $_[1];
+	my $mb = $self->{unit};
+	my $n = length($$dataref);
+	if (defined $self->{buffer}) {
+		$self->{buffer} .= $$dataref;
+	} else {
+		$self->{buffer} = $$dataref;
+	}
+	if (length($self->{buffer}) == $mb) {
+		$self->_eat_data_one_mb($self->{buffer});
+		$self->{buffer} = '';
+	} elsif (length($self->{buffer}) > $mb) {
+		my $i = -0;
+		while ($i + $mb <=  length($self->{buffer})) { # TODO this loop for performance optimization, and optimization is not tested
+			my $part = substr($self->{buffer}, $i, $mb);
+			$self->_eat_data_one_mb($part);
+			$i += $mb;
+		}
+		$self->{buffer} = substr($self->{buffer}, $i);
+	}
+}
+
+sub eat_another_treehash
+{
+	my ($self, $th) = @_;
+	croak unless $th->isa("App::MtAws::TreeHash");
+	$self->{tree}->[0] ||= [];
+	my $cnt = scalar @{ $self->{tree}->[0] };
+	my $newstart = $cnt ? $self->{tree}->[0]->[$cnt - 1]->{finish} + 1 : 0;
+	
+	push @{$self->{tree}->[0]}, map {
+		$newstart++;
+		{ joined => 9, start => $newstart-1, finish => $newstart-1, hash => $_->{hash} };
+	} @{$th->{tree}->[0]};
 }
 
 
 sub _eat_data_one_mb
 {
-	my ($self, $dataref)  = @_;
+	my $self = $_[0];
+	my $dataref = (ref($_[1]) eq '') ? \$_[1] : $_[1];
 	$self->{tree}->[0] ||= [];
+
+	if ($self->{last_chunk}) {
+		croak "Previous chunk of data was less than 1MiB";
+	}
+	if (length($$dataref) > $self->{unit}) {
+		croak "data chunk exceed 1MiB".length($$dataref);
+	} elsif (length($$dataref) < $self->{unit}) {
+		$self->{last_chunk} = 1;
+	}
+	
 	push @{ $self->{tree}->[0] }, { joined => 0, start => $self->{processed_size}, finish => $self->{processed_size}, hash => sha256($$dataref) };
 	$self->{processed_size}++;
 }
@@ -129,6 +187,7 @@ sub _eat_data_one_mb
 sub calc_tree
 {
 	my ($self)  = @_;
+	$self->_eat_data_one_mb($self->{buffer}) if defined($self->{buffer}) && length($self->{buffer});
 	my $prev_level = 0;
 	while (scalar @{ $self->{tree}->[$prev_level] } > 1) {
 		my $curr_level = $prev_level+1;
@@ -152,10 +211,55 @@ sub calc_tree
 }
 
 
+sub calc_tree_recursive
+{
+	my ($self) = @_;
+	my %h = map { $_->{start} => $_ } @{$self->{tree}->[0]};
+	$self->{max} = max keys %h;
+	$self->{by_position} = \%h;
+	
+	$self->{treehash_recursive_tree} = $self->_treehash_recursive();
+}
+
+sub _treehash_recursive
+{
+	my ($self, $a, $b) = @_;
+	if (defined($a)) {
+		if ($a == $b) {
+			return $self->{by_position}->{$a}->{hash};
+		} else {
+				my $middle = _maxpower($b-$a) + $a;
+				return sha256 ($self->_treehash_recursive($a, $middle - 1 ).$self->_treehash_recursive($middle, $b));
+		}
+	} else {
+		return $self->_treehash_recursive(0,$self->{max});
+	}
+}
+
+sub _maxpower
+{
+	my ($x) = @_;
+	die if $x == 0;
+    $x |= $x >> 1;
+    $x |= $x >> 2;
+    $x |= $x >> 4;
+    $x |= $x >> 8;
+    $x |= $x >> 16;
+    $x >>= 1;
+    $x++;
+    return $x;
+}
+
+
+
 sub get_final_hash
 {
 	my ($self)  = @_;
-	return unpack('H*', $self->{tree}->[ $#{$self->{tree}} ]->[0]->{hash} );
+	if (defined $self->{treehash_recursive_tree}) {
+		return unpack('H*', $self->{treehash_recursive_tree} );
+	} else {
+		return unpack('H*', $self->{tree}->[ $#{$self->{tree}} ]->[0]->{hash} );
+	}
 }
 
 
