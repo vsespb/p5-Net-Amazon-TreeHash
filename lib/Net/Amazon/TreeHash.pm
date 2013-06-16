@@ -153,7 +153,7 @@ sub eat_data_any_size
 sub eat_another_treehash
 {
 	my ($self, $th) = @_;
-	croak unless $th->isa("App::MtAws::TreeHash");
+	croak "First parameter should be Net::Amazon::TreeHash object" unless $th->isa("Net::Amazon::TreeHash");
 	$self->{tree}->[0] ||= [];
 	my $cnt = scalar @{ $self->{tree}->[0] };
 	my $newstart = $cnt ? $self->{tree}->[0]->[$cnt - 1]->{finish} + 1 : 0;
